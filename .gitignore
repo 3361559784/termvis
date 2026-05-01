@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Runtime data
+.termvis/life-traces/
+.termvis/soul-events/
+.termvis/chafa-*/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI tool configs (user-specific)
+.codex
+.mcp.json
+.copilot/
+.gemini/
+opencode.jsonc
+
+# Deep research reports (development artifacts)
+deep-research-report*.md
+
+# Env and secrets
+.env
+.env.*
+secrets.json
+
+# Build artifacts
+*.tgz
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.pid
+*.seed
+*.log
