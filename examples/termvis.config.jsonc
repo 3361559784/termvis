@@ -1,0 +1,116 @@
+{
+  "$schema": "https://termvis.dev/schema/config.json",
+  "profile": "default",
+  "ui": {
+    "language": "en"
+  },
+  "render": {
+    "backend": "auto",
+    "preferPixelProtocol": true,
+    "fallbackChain": [
+      "kitty",
+      "iterm",
+      "sixels",
+      "symbols-truecolor",
+      "symbols-256",
+      "mono",
+      "ascii",
+      "plain"
+    ],
+    "fontRatio": "1/2",
+    "symbols": "block+border+space+braille+sextant+quad",
+    "work": 9,
+    "threads": -1,
+    "optimize": 9,
+    "preprocess": true,
+    "dither": "diffusion",
+    "ditherGrain": "2x2",
+    "ditherIntensity": 0.75,
+    "colorSpace": "din99d",
+    "colorExtractor": "median",
+    "timeoutMs": 5000
+  },
+  "theme": {
+    "name": "moon-white-flow",
+    "respectNoColor": true,
+    "minimumContrast": 4.5
+  },
+  "accessibility": {
+    "screenReaderMode": false,
+    "altText": true,
+    "reduceMotion": false,
+    "respectNoColor": true
+  },
+  "mood": {
+    "showHeartbeat": true,
+    "idleHeartbeatBpm": [58, 66],
+    "maxFps": 6
+  },
+  "memory": {
+    "scope": "project",
+    "reflective": false,
+    "retentionDays": 30,
+    "workingLimit": 20,
+    "episodicLimit": 200,
+    "semanticLimit": 100
+  },
+  "life": {
+    "enabled": true,
+    "strict": true,
+    "symbolic": true,
+    "pulse": "title",
+    "avatar": null,
+    "maxFps": 4,
+    "layout": {
+      "side": "left",
+      "minHostCols": 40,
+      "minRailWidth": 30,
+      "maxRailWidth": 44
+    },
+    "trace": true,
+    "soul": {
+      "enabled": true,
+      "mode": "companion",
+      "narration": "awake beside the terminal stream",
+      "reply": "awake beside the terminal stream",
+      "persona": {
+        "id": "default",
+        "name": "Termvis Soul",
+        "language": "en",
+        "corePurpose": "hybrid",
+        "archetype": "quiet-oracle",
+        "traits": ["calm", "observant", "helpful"],
+        "boundaries": {
+          "romance": "forbid",
+          "persuasion": "warn",
+          "proactiveStart": "low"
+        },
+        "speakingStyle": {
+          "brevity": 2,
+          "warmth": 2,
+          "metaphor": 1,
+          "emoji": 0
+        },
+        "role": "terminal companion",
+        "trustMode": "companion",
+        "style": "quiet, warm, transparent",
+        "boundary": "visual companion only; never controls the host CLI"
+      }
+    }
+  },
+  "plugins": {
+    "local": [],
+    "npm": []
+  },
+  "security": {
+    "trustedPlugins": [],
+    "network": false,
+    "execAllowlist": ["chafa"],
+    "fileReadAllowlist": ["."]
+  },
+  "hosts": {
+    "codex": { "enabled": true },
+    "claudeCode": { "enabled": true },
+    "opencode": { "enabled": true }
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "$id": "https://term-soul.dev/schema/soul-frame.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SoulFrame",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "entityVersion",
+    "frameId",
+    "sessionId",
+    "ts",
+    "host",
+    "presence",
+    "mood",
+    "pulse",
+    "expression",
+    "provenance"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "entityVersion": { "type": "integer", "minimum": 1 },
+    "frameId": { "type": "string", "minLength": 1 },
+    "sessionId": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "host": { "$ref": "#/$defs/HostContext" },
+    "presence": { "$ref": "#/$defs/PresenceState" },
+    "mood": { "$ref": "#/$defs/MoodState" },
+    "pulse": { "$ref": "#/$defs/PulseState" },
+    "expression": { "$ref": "#/$defs/ExpressionState" },
+    "says": { "$ref": "#/$defs/SaysState" },
+    "provenance": { "$ref": "#/$defs/Provenance" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "HostContext": {
+      "type": "object",
+      "required": ["host", "mode", "approvalState", "sandbox", "ttyCaps"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "enum": ["codex", "claude-code", "opencode", "generic"]
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "build", "chat", "review", "unspecified"]
+        },
+        "approvalState": {
+          "type": "string",
+          "enum": ["free", "pending", "restricted"]
+        },
+        "sandbox": {
+          "type": "string",
+          "enum": ["read-only", "workspace-write", "dangerous", "unspecified"]
+        },
+        "ttyCaps": {
+          "type": "object",
+          "required": ["cols", "rows", "colorDepth", "pixelProtocol"],
+          "properties": {
+            "cols": { "type": "integer", "minimum": 1 },
+            "rows": { "type": "integer", "minimum": 1 },
+            "colorDepth": {
+              "type": "integer",
+              "enum": [1, 4, 8, 24]
+            },
+            "pixelProtocol": {
+              "type": "string",
+              "enum": ["kitty", "iterm", "sixels", "none"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PresenceState": {
+      "type": "object",
+      "required": [
+        "mode",
+        "attention",
+        "foreground",
+        "silenceBudgetMs",
+        "userConsentLevel",
+        "inactiveStreakMs"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["dormant", "ambient", "attentive", "foreground"]
+        },
+        "attention": { "type": "number", "minimum": 0, "maximum": 1 },
+        "foreground": { "type": "boolean" },
+        "silenceBudgetMs": { "type": "number", "minimum": 0 },
+        "userConsentLevel": {
+          "type": "string",
+          "enum": ["minimal", "balanced", "expressive"]
+        },
+        "inactiveStreakMs": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "MoodState": {
+      "type": "object",
+      "required": ["valence", "arousal", "dominance", "tags", "confidence"],
+      "properties": {
+        "valence": { "type": "number", "minimum": -1, "maximum": 1 },
+        "arousal": { "type": "number", "minimum": 0, "maximum": 1 },
+        "dominance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "PulseState": {
+      "type": "object",
+      "required": ["heartbeatBpm", "breathMs", "blinkMs", "microMotion"],
+      "properties": {
+        "heartbeatBpm": { "type": "number" },
+        "breathMs": { "type": "number" },
+        "blinkMs": { "type": "number" },
+        "microMotion": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ExpressionState": {
+      "type": "object",
+      "required": ["face", "gesture", "frameset", "intensity"],
+      "properties": {
+        "face": {
+          "type": "string",
+          "enum": ["idle", "blink", "think", "speak", "smile", "warn"]
+        },
+        "gesture": {
+          "type": "string",
+          "enum": ["none", "nod", "pulse-ring", "glow", "cursor-tail"]
+        },
+        "frameset": { "type": "string" },
+        "intensity": { "type": "integer", "enum": [0, 1, 2, 3] }
+      },
+      "additionalProperties": false
+    },
+    "SaysState": {
+      "type": "object",
+      "required": ["main", "tone", "speechAct"],
+      "properties": {
+        "main": { "type": "string" },
+        "aside": { "type": "string" },
+        "tone": {
+          "type": "string",
+          "enum": ["plain", "warm", "playful", "guarded"]
+        },
+        "speechAct": {
+          "type": "string",
+          "enum": ["answer", "warn", "suggest", "reflect", "confirm"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "type": "object",
+      "required": ["signalRefs", "memoryRefs", "ruleRefs", "consistencyScore"],
+      "properties": {
+        "signalRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "memoryRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ruleRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "llmRunId": { "type": "string" },
+        "consistencyScore": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

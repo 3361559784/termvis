@@ -1,0 +1,5 @@
+{
+  "name": "termvis",
+  "version": "0.1.0",
+  "description": "Terminal visual rendering tools backed by chafa when available."
+}

@@ -1,0 +1,58 @@
+{
+  "name": "termvis",
+  "version": "0.1.10",
+  "description": "Living terminal layer for AI CLIs using chafa, PTY observation, and MCP frames.",
+  "type": "module",
+  "bin": {
+    "termvis": "bin/termvis.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./adapters": "./src/adapters/index.js",
+    "./core": "./src/core/index.js",
+    "./mcp": "./src/mcp/server.js",
+    "./soul-bios": "./src/soul-bios/index.js",
+    "./cognition": "./src/cognition/index.js",
+    "./cognition/pipeline": "./src/cognition/pipeline/index.js",
+    "./memory": "./src/memory/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "doc",
+    "docs",
+    "examples/avatar-soft.svg",
+    "examples/termvis.config.jsonc",
+    "schemas",
+    "termvis.config.jsonc",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "test:unit": "node --test test/unit/*.test.js",
+    "test:integration": "node --test test/integration/*.test.js",
+    "check": "node --check bin/termvis.js && node --test",
+    "prepack": "npm run check"
+  },
+  "engines": {
+    "node": ">=20.10"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "keywords": [
+    "termvis",
+    "chafa",
+    "terminal",
+    "cli",
+    "ai-cli",
+    "living-terminal",
+    "mcp",
+    "pty",
+    "visual"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT"
+}

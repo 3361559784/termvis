@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="termvis soft avatar">
+  <defs>
+    <linearGradient id="hair" x1="30" x2="226" y1="36" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ad7ff"/>
+      <stop offset="0.54" stop-color="#b8a7ff"/>
+      <stop offset="1" stop-color="#ff9bc7"/>
+    </linearGradient>
+    <linearGradient id="face" x1="64" x2="196" y1="72" y2="210" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7f9"/>
+      <stop offset="1" stop-color="#ffdce8"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="36" fill="#12131a"/>
+  <path d="M44 118c0-50 34-86 84-86s84 36 84 86v46c0 40-30 68-84 68s-84-28-84-68z" fill="url(#hair)"/>
+  <path d="M66 126c2-45 27-74 62-74s60 29 62 74l-13 70c-10 18-28 28-49 28s-39-10-49-28z" fill="url(#face)"/>
+  <path d="M68 120c34-10 57-28 70-54 9 22 28 39 56 51-3-43-29-70-66-70-38 0-61 28-60 73z" fill="url(#hair)"/>
+  <circle cx="96" cy="142" r="10" fill="#252339"/>
+  <circle cx="160" cy="142" r="10" fill="#252339"/>
+  <circle cx="100" cy="138" r="3" fill="#ffffff"/>
+  <circle cx="164" cy="138" r="3" fill="#ffffff"/>
+  <path d="M116 169c8 8 16 8 24 0" fill="none" stroke="#252339" stroke-width="6" stroke-linecap="round"/>
+  <ellipse cx="78" cy="164" rx="14" ry="8" fill="#ff9ab8" opacity="0.62"/>
+  <ellipse cx="178" cy="164" rx="14" ry="8" fill="#ff9ab8" opacity="0.62"/>
+  <rect x="82" y="203" width="92" height="28" rx="9" fill="#252339"/>
+  <path d="M101 218l10-8-10-8M119 219h32" fill="none" stroke="#87f5d4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M43 96l-16-22 33 5M213 96l16-22-33 5" fill="#8ad7ff"/>
+</svg>
