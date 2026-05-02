@@ -201,14 +201,16 @@ before being painted. Alt-screen, clear screen, cursor movement, scrolling, long
 emoji, and SGR colors stay inside that viewport instead of growing the left soul rail in
 scrollback.
 
-For screen readers or plain logs:
+For screen readers or plain logs (hosted commands emit **one line per update** on stderr — the XML + “Plain:” dump is still available from `renderSoulAltText()` for tools that need it):
 
 ```bash
 node ./bin/termvis.js life --reader --title "Codex Soul" -- codex
 node ./bin/termvis.js life --plain --title "Gemini Soul" -- gemini
 ```
 
-This path emits `[termvis]` alt-text state mirrors and leaves the host output linear.
+This path keeps host stdout/stderr linear; soul status is appended as `[termvis] …` trace lines without multi-line markup.
+
+To force **24-bit** color when the runtime cannot infer depth (CI, piping, minimal `TERM`), set `FORCE_COLOR=3`. Use `FORCE_COLOR=1` for basic 16-color ANSI only.
 
 While `termvis life` is running, an MCP-capable host can call `termvis_soul_event` to append
 LLM-observed soul events to `.termvis/soul-events/<session>.jsonl`. The runtime polls those

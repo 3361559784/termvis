@@ -58,10 +58,12 @@ export function detectUnicodeLevel(env = process.env) {
   return "unicode-wide";
 }
 
+/** FORCE_COLOR: 0 off; 1 sixteen ANSI colors; 2 256 colors; 3 truecolor (24-bit). */
 function normalizeForceColor(value) {
   if (value === undefined || value === "" || value === "0") return 0;
-  if (value === "1" || value === "true") return 4;
+  if (value === "1") return 4;
   if (value === "2") return 8;
   if (value === "3") return 24;
+  if (value === "true") return 4;
   return 4;
 }

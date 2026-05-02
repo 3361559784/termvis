@@ -23,6 +23,7 @@ import {
   renderLifeTuiPanel,
   renderSoulSaysStrip,
   renderSoulAltText,
+  renderSoulReaderTraceLine,
   LifeTui,
   extractTerminalModePassthrough,
   terminalMouseEnableSequence,
@@ -471,6 +472,23 @@ test("life TUI cleanup resets terminal input modes", () => {
   assert.match(reset, /\u001b\[\?2004l/);
   assert.match(reset, /\u001b>/);
   assert.match(reset, /\u001b\[\?25h/);
+});
+
+test("renderSoulReaderTraceLine is single-line plain summary for stderr traces", () => {
+  const soul = createSoulState({
+    mood: "focused",
+    presence: "near the prompt",
+    reply: "I will stay quiet beside the command stream.",
+    persona: { name: "Mika" }
+  });
+  const snapshot = {
+    ...createLifeSnapshot({ title: "Reader", host: "gemini", state: "reasoning" }),
+    soul
+  };
+  const line = renderSoulReaderTraceLine(snapshot);
+  assert.equal(line.includes("\n"), false);
+  assert.match(line, /Soul Mika/);
+  assert.match(line, /Host gemini is reasoning/);
 });
 
 test("soul alt text mirrors visual state for reader mode", () => {

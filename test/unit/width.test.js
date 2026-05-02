@@ -11,6 +11,14 @@ test("cellWidth handles ASCII, CJK, combining marks, emoji, and ANSI", () => {
   assert.equal(cellWidth("\u001b[31m红\u001b[0m"), 2);
 });
 
+test("cellWidth treats legacy dingbat hearts/stars/music as single-column", () => {
+  assert.equal(cellWidth("\u2661"), 1);
+  assert.equal(cellWidth("\u2665"), 1);
+  assert.equal(cellWidth("\u266a"), 1);
+  assert.equal(cellWidth("\u2605"), 1);
+  assert.equal(cellWidth("  \u2572\u2500\u2500\u2661\u2661\u2500\u2500\u256f  "), 12);
+});
+
 test("stripAnsi removes CSI and OSC sequences", () => {
   assert.equal(stripAnsi("\u001b[31mred\u001b[0m"), "red");
   assert.equal(stripAnsi("\u001b]52;c;abc\u0007text"), "text");

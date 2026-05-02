@@ -706,7 +706,9 @@ export function injectSecretsIntoEnv(env = process.env) {
     anthropic: "ANTHROPIC_API_KEY"
   };
   for (const [provider, envName] of Object.entries(mapping)) {
-    if (secrets[provider] && !env[envName]) {
+    const cur = env[envName];
+    // Treat only undefined/null as unset so callers can pass "" to block file-backed secrets (tests/CI).
+    if (secrets[provider] && (cur === undefined || cur === null)) {
       env[envName] = secrets[provider];
     }
   }

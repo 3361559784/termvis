@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 
 const OSC_52_PATTERN = /\u001b\]52;[\s\S]*?(?:\u0007|\u001b\\)/g;
 const DANGEROUS_OSC_PATTERN = /\u001b\](?:[0-9]+;)?[\s\S]*?(?:\u0007|\u001b\\)/g;
@@ -15,7 +15,13 @@ export function createSecurityPolicy(config = {}, { cwd = process.cwd() } = {}) 
     allowExec: (command) => execAllowlist.has(command),
     allowFileRead: (path) => {
       const absolute = resolve(cwd, path);
-      return roots.some((root) => absolute === root || absolute.startsWith(`${root}/`));
+      return roots.some((root) => {
+        const base = resolve(root);
+        const abs = resolve(absolute);
+        if (abs === base) return true;
+        const prefix = base.endsWith(sep) ? base : `${base}${sep}`;
+        return abs.startsWith(prefix);
+      });
     },
     sanitizeOutput: (text) => sanitizeTerminalOutput(text)
   };

@@ -899,6 +899,18 @@ export function renderSoulAltText(state = {}, snapshot = {}) {
   return `${structured}\nPlain: ${plainSummary}`;
 }
 
+/**
+ * One-line status for `--reader` / `--plain` during a hosted command: append-only stderr log
+ * without the multi-line XML block (avoids scrollback/TUI-like clutter mixed with host stdout).
+ */
+export function renderSoulReaderTraceLine(snapshot = {}) {
+  const full = renderSoulAltText(snapshot.soul || {}, snapshot);
+  const marker = "\nPlain: ";
+  const idx = full.indexOf(marker);
+  const raw = idx >= 0 ? full.slice(idx + marker.length) : full;
+  return raw.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function inferToneFromMood(mood) {
   const d = mood.discrete || "calm";
   if (d === "delighted" || d === "curious") return "warm";

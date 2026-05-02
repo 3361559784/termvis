@@ -40,7 +40,7 @@ Life options:
   --avatar-align <x,y>    Alignment (e.g. mid,mid)
   --avatar-scale <n|max>  Scale factor
   --state <state>         Initial state
-  --reader|--plain        Accessibility mode
+  --reader|--plain        Plain trace: one-line soul status on stderr (no XML HUD)
 
 API configuration:
   Set via 'termvis setup' or environment variables:

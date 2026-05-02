@@ -87,37 +87,99 @@ export async function renderVisual({
     ...modeToChafaArgs(modeSelection.mode, caps, config, { image }),
     source.path
   ];
-  const result = await runChafa(chafa.path, args, {
-    spawnImpl,
-    env,
-    timeoutMs: config.render?.timeoutMs || 5000
-  });
+  const timeoutMs = config.render?.timeoutMs || 5000;
+  try {
+    const result = await runChafa(chafa.path, args, {
+      spawnImpl,
+      env,
+      timeoutMs
+    });
 
-  return {
-    mode: modeSelection.mode,
-    payload: result.stdout,
-    altText: alt,
-    command: basename(chafa.path),
-    args,
-    metrics: {
-      renderMs: performance.now() - started,
-      fallback: false,
-      stderr: result.stderr
-    }
-  };
+    return {
+      mode: modeSelection.mode,
+      payload: result.stdout,
+      altText: alt,
+      command: basename(chafa.path),
+      args,
+      metrics: {
+        renderMs: performance.now() - started,
+        fallback: false,
+        stderr: result.stderr
+      }
+    };
+  } catch (err) {
+    if (strict) throw err;
+    const reason = err?.message || String(err);
+    return {
+      mode: "plain",
+      payload: renderTextFallback({ alt, source: source?.path, caps, reason }),
+      altText: alt,
+      command: basename(chafa.path),
+      args,
+      metrics: {
+        renderMs: performance.now() - started,
+        fallback: true,
+        stderr: reason
+      }
+    };
+  }
+}
+
+function detachSpawnAfterKill(child) {
+  try {
+    child.stdout?.destroy?.();
+  } catch {
+    /* ignore */
+  }
+  try {
+    child.stderr?.destroy?.();
+  } catch {
+    /* ignore */
+  }
+  try {
+    child.unref?.();
+  } catch {
+    /* ignore */
+  }
 }
 
 export function runChafa(command, args, { spawnImpl = spawn, env = process.env, timeoutMs = 5000 } = {}) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+
+    const winBatch =
+      process.platform === "win32" && /\.(?:cmd|bat)$/i.test(String(command || ""));
     const child = spawnImpl(command, args, {
       env,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
+      ...(winBatch ? { shell: true } : {})
     });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`chafa timed out after ${timeoutMs}ms`));
+      settle(() => {
+        try {
+          child.kill(process.platform === "win32" ? undefined : "SIGTERM");
+        } catch {
+          /* ignore */
+        }
+        const forceKill = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            /* ignore */
+          }
+        }, 450);
+        forceKill.unref?.();
+        detachSpawnAfterKill(child);
+        reject(new Error(`chafa timed out after ${timeoutMs}ms`));
+      });
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk) => {
@@ -127,13 +189,13 @@ export function runChafa(command, args, { spawnImpl = spawn, env = process.env, 
       stderr += chunk.toString("utf8");
     });
     child.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
+      settle(() => reject(error));
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0) resolve({ stdout, stderr });
-      else reject(new Error(`chafa failed with exit code ${code}: ${stderr}`));
+      settle(() => {
+        if (code === 0) resolve({ stdout, stderr });
+        else reject(new Error(`chafa failed with exit code ${code}: ${stderr}`));
+      });
     });
   });
 }

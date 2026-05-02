@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "termvis": {
+      "command": "termvis",
+      "args": ["mcp"],
+      "includeTools": [
+        "termvis_probe",
+        "termvis_render_card",
+        "termvis_render_image",
+        "termvis_life_frame",
+        "termvis_soul_event",
+        "termvis_soul_config"
+      ]
+    }
+  }
+}

@@ -19,8 +19,8 @@ test("CLI adapter codex prints MCP config snippet", async () => {
   const stdout = collectableWritable();
   await main(["adapter", "codex"], fakeIo(stdout));
   assert.match(stdout.text, /\[mcp_servers\.termvis\]/);
-  assert.match(stdout.text, /command = "\/usr\/bin\/node"/);
-  assert.match(stdout.text, /bin\/termvis\.js", "mcp"/);
+  assert.match(stdout.text, /command = ".+(?:node|nodejs)(?:\.exe)?"/i);
+  assert.match(stdout.text, /termvis\.js.+mcp/s);
 });
 
 test("CLI schema prints JSON schema", async () => {
@@ -114,20 +114,22 @@ test("CLI life can render without the visual soul layer", async () => {
   assert.doesNotMatch(stdout.text, /soul\s+Termvis Soul/);
 });
 
+const readerSmokeHost = ["node", "-e", "process.stdout.write('hi')"];
+
 test("CLI life reader mode runs gracefully without a real LLM", async () => {
   const stdout = collectableWritable();
   const stderr = collectableWritable();
-  await main(["life", "--reader", "--title", "Reader CLI", "--", "printf", "hi"], fakeIo(stdout, stderr));
+  await main(["life", "--reader", "--title", "Reader CLI", "--", ...readerSmokeHost], fakeIo(stdout, stderr));
   assert.equal(stdout.text, "hi");
 });
 
 test("CLI life reader mode can run host stdout with soul disabled", async () => {
   const stdout = collectableWritable();
   const stderr = collectableWritable();
-  await main(["life", "--reader", "--soul-off", "--title", "Reader CLI", "--", "printf", "hi"], fakeIo(stdout, stderr));
+  await main(["life", "--reader", "--soul-off", "--title", "Reader CLI", "--", ...readerSmokeHost], fakeIo(stdout, stderr));
   assert.equal(stdout.text, "hi");
   assert.match(stderr.text, /\[termvis\].*Soul Termvis Soul/s);
-  assert.match(stderr.text, /Host printf hi is succeeded/);
+  assert.match(stderr.text, /Host node -e process\.stdout\.write\('hi'\) is succeeded/);
 });
 
 function fakeIo(stdout, stderr = collectableWritable(), overrides = {}) {

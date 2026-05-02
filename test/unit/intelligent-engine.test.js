@@ -167,7 +167,8 @@ describe("Intelligent SoulEngine", () => {
         env: {},
         sessionId: "intelligent-test",
         requireLlm: true,
-        skipSecrets: true
+        skipSecrets: true,
+        config: { cognition: { ollama: { probe: false } } }
       }),
       /No real LLM provider available/
     );

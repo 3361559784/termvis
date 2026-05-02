@@ -18,6 +18,7 @@
   },
   "files": [
     "bin",
+    "scripts",
     "src",
     "doc",
     "docs",
@@ -28,6 +29,7 @@
     "README.md"
   ],
   "scripts": {
+    "postinstall": "node scripts/fix-node-pty-spawn-helper.js",
     "test": "node --test",
     "test:unit": "node --test test/unit/*.test.js",
     "test:integration": "node --test test/integration/*.test.js",

@@ -1,9 +1,13 @@
 import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 
+const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "workspace-mcp");
+
 test("workspace Copilot MCP config exposes termvis tools", async () => {
-  const config = JSON.parse(await readFile(".mcp.json", "utf8"));
+  const config = JSON.parse(await readFile(join(fixtureDir, "mcp.json"), "utf8"));
   assert.equal(config.mcpServers.termvis.command, "termvis");
   assert.deepEqual(config.mcpServers.termvis.args, ["mcp"]);
   assert.equal(config.mcpServers.termvis.cwd, undefined);
@@ -18,7 +22,7 @@ test("workspace Copilot MCP config exposes termvis tools", async () => {
 });
 
 test("workspace Gemini settings exposes termvis MCP server", async () => {
-  const config = JSON.parse(await readFile(".gemini/settings.json", "utf8"));
+  const config = JSON.parse(await readFile(join(fixtureDir, "gemini-settings.json"), "utf8"));
   assert.equal(config.mcpServers.termvis.command, "termvis");
   assert.deepEqual(config.mcpServers.termvis.args, ["mcp"]);
   assert.equal(config.mcpServers.termvis.cwd, undefined);
@@ -33,7 +37,7 @@ test("workspace Gemini settings exposes termvis MCP server", async () => {
 });
 
 test("Gemini extension exposes termvis MCP server and context", async () => {
-  const extension = JSON.parse(await readFile(".gemini/extensions/termvis/gemini-extension.json", "utf8"));
+  const extension = JSON.parse(await readFile(join(fixtureDir, "gemini-extension.json"), "utf8"));
   assert.equal(extension.name, "termvis");
   assert.equal(extension.contextFileName, "GEMINI.md");
   assert.equal(extension.mcpServers.termvis.cwd, "${workspacePath}");
@@ -50,7 +54,7 @@ test("Gemini extension exposes termvis MCP server and context", async () => {
     "termvis_soul_config"
   ]);
 
-  const context = await readFile(".gemini/extensions/termvis/GEMINI.md", "utf8");
+  const context = await readFile(join(fixtureDir, "GEMINI.md"), "utf8");
   assert.match(context, /termvis MCP tools/);
   assert.match(context, /termvis_soul_event/);
   assert.match(context, /termvis_soul_config/);

@@ -98,10 +98,21 @@ function tokenizeAnsi(str) {
 
 function graphemeWidth(segment) {
   if (!segment) return 0;
-  if (/[\u200d\ufe0f]/u.test(segment) || hasEmoji(segment)) return 2;
-  let width = 0;
-  for (const char of segment) width += codePointWidth(char.codePointAt(0));
-  return Math.min(Math.max(width, 0), 2);
+  if (/[\u200d\ufe0f]/u.test(segment)) return 2;
+  const scalarWidths = [];
+  for (const char of segment) scalarWidths.push(codePointWidth(char.codePointAt(0)));
+  const codeSum = scalarWidths.reduce((a, b) => a + b, 0);
+  const minSeg = Math.min(Math.max(codeSum, 0), 2);
+  if (!hasEmoji(segment)) return minSeg;
+  /** Unicode marks many dingbats as Extended_Pictographic even though common monospace fonts render them as single-column (playing-card suits, ♪, ★, etc.). Prefer EastAsianWidth-style counting for lone scalars to match terminal columns on Windows/macOS. */
+  const scalars = [...segment];
+  if (
+    scalars.length === 1 &&
+    legacyEmojiStyledSymbolSingleCell(scalars[0].codePointAt(0))
+  ) {
+    return minSeg;
+  }
+  return 2;
 }
 
 function codePointWidth(code) {
@@ -115,6 +126,13 @@ function codePointWidth(code) {
 
 function hasEmoji(segment) {
   return /\p{Extended_Pictographic}/u.test(segment);
+}
+
+function legacyEmojiStyledSymbolSingleCell(code) {
+  if (code === undefined) return false;
+  if (code >= 0x2660 && code <= 0x266f) return true;
+  if (code === 0x2605 || code === 0x2606) return true;
+  return false;
 }
 
 function isCombining(code) {

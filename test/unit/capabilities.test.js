@@ -25,6 +25,16 @@ test("NO_COLOR forces monochrome capability", () => {
   assert.equal(caps.colorDepth, 1);
 });
 
+test("FORCE_COLOR=3 maps to truecolor depth when terminal is not dumb", () => {
+  const caps = detectTerminalCapabilities({
+    env: { TERM: "xterm-256color", FORCE_COLOR: "3" },
+    stdout: { isTTY: false, columns: 80, rows: 24 },
+    stdin: { isTTY: false }
+  });
+  assert.equal(caps.forceColor, true);
+  assert.equal(caps.colorDepth, 24);
+});
+
 test("pixel protocol can be detected or overridden", () => {
   assert.equal(detectPixelProtocol({ KITTY_WINDOW_ID: "1" }, { isTTY: true }), "kitty");
   assert.equal(detectPixelProtocol({ TERM_PROGRAM: "iTerm.app" }, { isTTY: true }), "iterm");

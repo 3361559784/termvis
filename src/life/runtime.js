@@ -11,7 +11,7 @@ import {
   createSoulEventStore,
   createSoulState,
   readSoulEvents,
-  renderSoulAltText
+  renderSoulReaderTraceLine
 } from "./soul.js";
 import { createIntelligentSoulEngine } from "../soul-bios/engine.js";
 import { createSignalEvent, createSoulBiosCaps } from "../soul-bios/types.js";
@@ -67,7 +67,8 @@ export async function runLivingCommand({
     tty: runtimeReaderMode || Boolean(caps.isTTY && !caps.termDumb),
     color: runtimeReaderMode || Boolean(!caps.noColor && caps.colorDepth >= 8),
     chafa: runtimeReaderMode || Boolean(chafa.available),
-    nodePty: Boolean(pty)
+    // Reader/plain trace can fall back to piped host I/O when node-pty is unavailable (Windows/npm CI).
+    nodePty: runtimeReaderMode || Boolean(pty)
   };
 
   if (runtimeStrict) {
@@ -590,7 +591,7 @@ function chooseLifeLlmProvider(cognitionConfig = {}, hostId = "") {
 }
 
 function writeReaderLine(io, snapshot) {
-  io.stderr?.write?.(`[termvis] ${renderSoulAltText(snapshot.soul, snapshot)}\n`);
+  io.stderr?.write?.(`[termvis] ${renderSoulReaderTraceLine(snapshot)}\n`);
 }
 
 export async function renderLivingFrame(options = {}) {
@@ -637,8 +638,16 @@ async function observeChunk(snapshot, chunk, tracePath, onEvent) {
 }
 
 async function writeLifeFrame(io, engine, snapshot, options) {
-  const frame = await renderLifeFrame({ io, engine, snapshot, ...options });
-  io.stdout.write(frame);
+  try {
+    const frame = await renderLifeFrame({ io, engine, snapshot, ...options });
+    io.stdout.write(frame);
+  } catch (err) {
+    try {
+      io.stderr?.write?.(`[termvis] life frame unavailable: ${sanitizeErrorMessage(err)}\n`);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 async function createTrace(cwd, snapshot) {

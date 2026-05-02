@@ -127,14 +127,21 @@ describe("LLM Provider", () => {
   });
 
   test("createLLMProvider returns null when no real provider configured", async () => {
-    const env = {};
-    const provider = await createLLMProvider({ env });
+    const provider = await createLLMProvider({
+      env: {},
+      probeOllama: false
+    });
     assert.equal(provider, null);
   });
 
   test("createLLMProvider can prefer Codex CLI when explicitly requested", async () => {
-    const provider = await createLLMProvider({ env: process.env, preferred: "codex" });
-    if (provider) assert.equal(provider.name, "codex");
+    const provider = await createLLMProvider({
+      env: { TERMVIS_CODEX_BIN: process.execPath },
+      preferred: "codex",
+      probeOllama: false
+    });
+    assert.ok(provider, "expected Codex CLI slot to resolve using TERMVIS_CODEX_BIN");
+    assert.equal(provider.name, "codex");
   });
 
   test("createLLMProvider can prefer DeepSeek when configured", async () => {
