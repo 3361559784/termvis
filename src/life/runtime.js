@@ -613,10 +613,16 @@ function runWithPty(pty, command, args, io, {
     });
 
     const dataDisposable = child.onData((chunk) => {
-      pending.push(Promise.allSettled([
+    const pending = new Set();
+    // ... inside onData callback
+    const dataDisposable = child.onData((chunk) => {
+      const p = Promise.allSettled([
         mirrorHostOutput ? writeStream(io.stdout, chunk) : Promise.resolve(),
         onOutput?.(chunk).catch(() => {})
-      ]));
+      ]);
+      pending.add(p);
+      p.finally(() => pending.delete(p));
+    });
     });
     const exitDisposable = child.onExit(async ({ exitCode }) => {
       if (settled) return;
