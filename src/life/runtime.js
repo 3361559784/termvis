@@ -193,6 +193,8 @@ export async function runLivingCommand({
     cleanupRuntime().finally(() => process.exit(0));
   };
   const crashHandler = (err) => {
+    if (exitHandled) return;
+    exitHandled = true;
     // Attempt graceful terminal reset before exiting with error
     try {
       if (tui && !transparentHostMode && !runtimeReaderMode) {
