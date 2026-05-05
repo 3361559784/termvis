@@ -8,7 +8,7 @@ export {
   createAppraisal,
   createActionTendency,
   createVisibleMood,
-  createMoodFrameV2,
+  createMoodFrame,
   createMoodImpulse,
   createMoodAnchor,
   createMoodDebt,
@@ -29,8 +29,8 @@ export { createMoodMemory } from "./memory/mood-memory.js";
 export { createEpisodeSummarizer } from "./memory/episode-summary.js";
 
 export { createSoulRuntime } from "./soul-runtime.js";
-export { createPulseStateV2, createPulseEngine, derivePulseVisual } from "./pulse-v2.js";
-export { createPresenceStateV2, createPresenceScheduler, derivePresenceVisual, PRESENCE_MODES, PRESENCE_STANCES, GAZE_TARGETS } from "./presence-v2.js";
-export { createHostStateV2, createHostModel, deriveHostVisual } from "./host-v2.js";
-export { createMemoryStateV2, createMemoryModel, deriveMemoryVisual } from "./memory-v2.js";
-export { createSoulSignalV2, bridgeSignalToV2, deriveSignalVisual, SIGNAL_V2_KINDS } from "./signal-v2.js";
+export { createPulseState, createPulseEngine, derivePulseVisual } from "./pulse.js";
+export { createPresenceState, createPresenceScheduler, derivePresenceVisual, PRESENCE_MODES, PRESENCE_STANCES, GAZE_TARGETS } from "./presence.js";
+export { createHostState, createHostModel, deriveHostVisual } from "./host.js";
+export { createMemoryState, createMemoryModel, deriveMemoryVisual } from "./memory-model.js";
+export { createSoulSignalV2, bridgeSignalToV2, deriveSignalVisual, SIGNAL_V2_KINDS } from "./signal.js";

@@ -1,6 +1,6 @@
 import { clamp } from "./types.js";
 
-export function createMemoryStateV2(overrides = {}) {
+export function createMemoryState(overrides = {}) {
   const o = overrides || {};
   const rhythm = o.rhythm || {};
   const relationship = o.relationship || {};
@@ -132,7 +132,7 @@ export function createMemoryModel() {
   }
 
   function getState() {
-    return createMemoryStateV2(state);
+    return createMemoryState(state);
   }
 
   function reset() {

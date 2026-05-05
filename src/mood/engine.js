@@ -1,4 +1,4 @@
-import { createMoodFrameV2, createSemanticPacket } from "./types.js";
+import { createMoodFrame, createSemanticPacket } from "./types.js";
 import { findPrototype } from "./prototypes.js";
 import { signalToImpulses } from "./rules/index.js";
 import { createIntegrator, computeBaseline } from "./integrator.js";
@@ -224,7 +224,7 @@ export function createMoodEngine(options = {}) {
       try {
         currentFrame = integrator.getVisibleState();
       } catch {
-        currentFrame = createMoodFrameV2();
+        currentFrame = createMoodFrame();
       }
 
       try {
@@ -253,7 +253,7 @@ export function createMoodEngine(options = {}) {
         try {
           frame = integrator.getVisibleState();
         } catch {
-          frame = createMoodFrameV2();
+          frame = createMoodFrame();
         }
       }
 
@@ -301,7 +301,7 @@ export function createMoodEngine(options = {}) {
         /* episode logging must not break tick */
       }
 
-      return createMoodFrameV2({
+      return createMoodFrame({
         core: frame.core,
         appraisal: frame.appraisal,
         tendency: frame.tendency,
@@ -316,7 +316,7 @@ export function createMoodEngine(options = {}) {
       try {
         return integrator.getVisibleState();
       } catch {
-        return createMoodFrameV2();
+        return createMoodFrame();
       }
     },
 

@@ -468,7 +468,7 @@ export function createVisibleMood(overrides = {}) {
  * @param {object} [overrides]
  * @returns {Readonly<{ core: Readonly<CoreAffect>, appraisal: Readonly<AppraisalDims>, tendency: Readonly<ActionTendencyDims>, mood: ReturnType<typeof createVisibleMood> }>}
  */
-export function createMoodFrameV2(overrides = {}) {
+export function createMoodFrame(overrides = {}) {
   const o = /** @type {{ core?: object, appraisal?: object, tendency?: object, mood?: object }} */ (
     overrides
   );

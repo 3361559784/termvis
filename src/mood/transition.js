@@ -36,11 +36,11 @@ const RISE_END_MS = 1500;
 const DIST_CONF_SCALE = 3.75;
 const DIST_INTENSITY_SCALE = 2.75;
 
-/** @typedef {ReturnType<import("./types.js").createMoodFrameV2>} MoodFrameV2 */
+/** @typedef {ReturnType<import("./types.js").createMoodFrame>} MoodFrame */
 /** @typedef {ReturnType<typeof findPrototype>} MoodPrototype */
 
 /**
- * @param {MoodFrameV2} frame
+ * @param {MoodFrame} frame
  * @param {MoodPrototype} proto
  * @returns {number}
  */
@@ -154,7 +154,7 @@ function impulseCauseIds(impulses) {
 }
 
 /**
- * @param {MoodFrameV2} frame
+ * @param {MoodFrame} frame
  * @param {MoodPrototype} proto
  * @param {MoodPrototype} currentProto
  * @param {ReturnType<typeof normalizeImpulses>} impulses
@@ -290,7 +290,7 @@ export function createTransitionGovernor(config = {}) {
   }
 
   /**
-   * @param {MoodFrameV2 | null} frame
+   * @param {MoodFrame | null} frame
    * @param {string} newId
    * @param {string} oldId
    * @param {number} now
@@ -320,16 +320,16 @@ export function createTransitionGovernor(config = {}) {
     currentMoodId = newId;
   }
 
-  let lastFrameRef = /** @type {MoodFrameV2 | null} */ (null);
+  let lastFrameRef = /** @type {MoodFrame | null} */ (null);
 
   return {
     /**
-     * @param {MoodFrameV2} moodFrameV2
+     * @param {MoodFrame} moodFrame
      * @param {unknown[]} [activeImpulses]
      * @param {number} [now]
      */
-    update(moodFrameV2, activeImpulses = [], now = Date.now()) {
-      lastFrameRef = moodFrameV2;
+    update(moodFrame, activeImpulses = [], now = Date.now()) {
+      lastFrameRef = moodFrame;
       pruneCooldowns(now);
       pruneSwitchHistory(now);
       const impulses = normalizeImpulses(activeImpulses);

@@ -24,6 +24,9 @@ import {
   renderSoulSaysStrip,
   renderSoulAltText,
   renderSoulReaderTraceLine,
+  chooseLifeLlmProvider,
+  selectTuiAvatarSymbols,
+  shouldPassthroughHostCommand,
   LifeTui,
   extractTerminalModePassthrough,
   terminalMouseEnableSequence,
@@ -92,6 +95,36 @@ test("life frame composes state panel with symbolic avatar payload", async () =>
   assert.match(frame, /avatar-symbols/);
 });
 
+test("life frame shapes plain avatar fallback into a boxed placeholder", async () => {
+  const engine = {
+    probeCapabilities: () => ({
+      isTTY: false,
+      termDumb: true,
+      noColor: true,
+      colorDepth: 1,
+      cols: 64,
+      rows: 24,
+      pixelProtocol: "none",
+      unicodeLevel: "unicode-wide"
+    }),
+    renderBlock: async () => ({
+      mode: "plain",
+      altText: "Living CLI avatar",
+      payload: "[visual: Living CLI avatar (examples/avatar-soft.svg); chafa not found]\n"
+    })
+  };
+  const frame = await renderLifeFrame({
+    engine,
+    snapshot: createLifeSnapshot({ title: "Living CLI", host: "terminal", state: "awakening" }),
+    width: 64,
+    avatarWidth: 24,
+    avatarHeight: 8
+  });
+  assert.match(frame, /Living CLI avatar/);
+  assert.match(frame, /src:\s+avatar-soft\.svg/);
+  assert.match(frame, /chafa not found/);
+});
+
 test("living frame honors configured avatar and persona when CLI does not override", async () => {
   const renderCalls = [];
   const engine = {
@@ -139,6 +172,56 @@ test("living frame honors configured avatar and persona when CLI does not overri
   assert.match(frame, /configured-avatar/);
   assert.match(frame, /soul\s+Configured Soul/);
   assert.match(frame, /says configured soul says/);
+});
+
+test("life LLM provider stays explicit and does not inherit codex host identity", () => {
+  assert.equal(chooseLifeLlmProvider({}), "auto");
+  assert.equal(chooseLifeLlmProvider({ llm: { provider: "codex" } }), "codex");
+  assert.equal(chooseLifeLlmProvider({ llm: { provider: "ollama" } }), "ollama");
+});
+
+test("codex host commands use transparent passthrough mode", () => {
+  assert.equal(shouldPassthroughHostCommand("codex"), true);
+  assert.equal(shouldPassthroughHostCommand("/Users/liuziheng/codex-0.80.0"), true);
+  assert.equal(shouldPassthroughHostCommand("gemini"), false);
+});
+
+test("life TUI avatar symbols stay font-compatible when config includes unstable sets", () => {
+  assert.equal(
+    selectTuiAvatarSymbols({ render: { symbols: "block+border+space+braille+sextant+quad" } }),
+    "block+border+space"
+  );
+  assert.equal(
+    selectTuiAvatarSymbols({ render: { symbols: "braille+sextant+quad" } }),
+    "block+border+space"
+  );
+  assert.equal(
+    selectTuiAvatarSymbols({ render: { symbols: "ascii" } }),
+    "ascii"
+  );
+  assert.equal(
+    selectTuiAvatarSymbols(
+      { render: { symbols: "block+border+space" } },
+      { termProgram: "JetBrains-JediTerm" }
+    ),
+    "ascii"
+  );
+  assert.equal(
+    selectTuiAvatarSymbols(
+      { render: { symbols: "block+border+space+braille+sextant+quad" } },
+      {},
+      { TERMVIS_LIFE_AVATAR_SYMBOLS: "ascii" }
+    ),
+    "ascii"
+  );
+  assert.equal(
+    selectTuiAvatarSymbols(
+      { render: { symbols: "ascii" } },
+      {},
+      { TERMVIS_LIFE_AVATAR_SYMBOLS: "safe" }
+    ),
+    "block+border+space"
+  );
 });
 
 test("life TUI panel keeps avatar and status in a fixed-size left rail", () => {
@@ -417,20 +500,24 @@ test("life TUI forwards host input modes without forwarding host drawing modes",
 });
 
 test("life TUI maps terminal mouse coordinates into the host viewport", () => {
+  const hostInputModes = new Set(["1000", "1006"]);
   const inside = translateHostInputForTui("\u001b[<64;40;7M", {
     hostLeft: 34,
     hostCols: 47,
-    hostRows: 18
+    hostRows: 18,
+    hostInputModes
   });
   const outside = translateHostInputForTui("\u001b[<64;12;7M", {
     hostLeft: 34,
     hostCols: 47,
-    hostRows: 18
+    hostRows: 18,
+    hostInputModes
   });
   const x10 = translateHostInputForTui(Buffer.from([0x1b, 0x5b, 0x4d, 32, 40 + 32, 7 + 32]), {
     hostLeft: 34,
     hostCols: 47,
-    hostRows: 18
+    hostRows: 18,
+    hostInputModes
   });
 
   assert.equal(inside, "\u001b[<64;7;7M");
@@ -453,6 +540,8 @@ test("life TUI consumes rail mouse wheel and forwards host wheel", () => {
     avatarHeight: 8,
     caps: { noColor: true }
   });
+  tui.hostInputModes.add("1000");
+  tui.hostInputModes.add("1006");
 
   const rail = tui.translateInput("\u001b[<65;12;7M");
   const host = tui.translateInput("\u001b[<64;40;7M");
