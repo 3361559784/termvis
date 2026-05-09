@@ -1,6 +1,6 @@
 import {
   clamp,
-  createMoodFrameV2,
+  createMoodFrame,
   createCoreAffect,
   createAppraisal,
   createActionTendency,
@@ -105,7 +105,7 @@ function mutableTendencyFrom(src) {
   return o;
 }
 
-/** @param {ReturnType<typeof createMoodFrameV2>} frame */
+/** @param {ReturnType<typeof createMoodFrame>} frame */
 function mutableMoodFromFrame(frame) {
   const m = frame.mood;
   return {
@@ -257,7 +257,7 @@ export function createIntegrator(config = {}) {
   /** @type {{ valence: number, arousal: number, dominance: number }} */
   let baseline = mutableCoreFrom(baselineCore);
 
-  const blank = createMoodFrameV2({
+  const blank = createMoodFrame({
     core: baselineCore,
     appraisal: {},
     tendency: {},
@@ -274,7 +274,7 @@ export function createIntegrator(config = {}) {
   let lastTickAt = null;
 
   function reset() {
-    const fr = createMoodFrameV2({
+    const fr = createMoodFrame({
       core: createCoreAffect(baseline),
       appraisal: {},
       tendency: {},
@@ -296,7 +296,7 @@ export function createIntegrator(config = {}) {
 
   function getRawState() {
     clampMutableFrame(raw);
-    return createMoodFrameV2({
+    return createMoodFrame({
       core: raw.core,
       appraisal: raw.appraisal,
       tendency: raw.tendency,
@@ -306,7 +306,7 @@ export function createIntegrator(config = {}) {
 
   function getVisibleState() {
     clampMutableFrame(visible);
-    return createMoodFrameV2({
+    return createMoodFrame({
       core: visible.core,
       appraisal: visible.appraisal,
       tendency: visible.tendency,

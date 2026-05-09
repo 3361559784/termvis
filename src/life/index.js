@@ -2,6 +2,7 @@ export * from "./state.js";
 export * from "./soul.js";
 export * from "./memory.js";
 export * from "./frame.js";
+export { renderLifeFrame as renderLivingFrame } from "./frame.js";
 export * from "./tui.js";
 export * from "./viewport.js";
 export * from "./runtime.js";

@@ -80,7 +80,7 @@ const DEFAULT_PULSE_STATE = Object.freeze({
  *   causeIds: readonly string[],
  * }>}
  */
-export function createPulseStateV2(overrides = {}) {
+export function createPulseState(overrides = {}) {
   const o = /** @type {Record<string, unknown>} */ (overrides);
   const causeIdsIn =
     "causeIds" in o && Array.isArray(o.causeIds)
@@ -236,7 +236,7 @@ export function createPulseEngine(config = {}) {
      * @param {object} [memDebt]
      */
     tick(dtMs, moodFrame, hostPressure = {}, memDebt = {}) {
-      const prev = createPulseStateV2(internal);
+      const prev = createPulseState(internal);
       const dtMsSafe = Math.min(Number(dtMs) || 0, 2000);
 
       const core = moodFrame?.core || {};
@@ -368,11 +368,11 @@ export function createPulseEngine(config = {}) {
       internal.irregularity = irregularity;
       internal.pulseEvent = pulseEvent;
 
-      return createPulseStateV2(internal);
+      return createPulseState(internal);
     },
 
     getState() {
-      return createPulseStateV2(internal);
+      return createPulseState(internal);
     },
 
     reset() {
@@ -388,7 +388,7 @@ function miniBar(value, width) {
   return "▓".repeat(fill) + "░".repeat(Math.max(0, width - fill));
 }
 
-/** @param {ReturnType<typeof createPulseStateV2>} pulse */
+/** @param {ReturnType<typeof createPulseState>} pulse */
 function generateBeatWave(pulse) {
   const phase = pulse.beatPhase || 0;
   const strength = pulse.beatStrength || 0.5;
@@ -404,7 +404,7 @@ function generateBeatWave(pulse) {
 }
 
 /**
- * @param {Readonly<Partial<ReturnType<typeof createPulseStateV2>>>} pulse
+ * @param {Readonly<Partial<ReturnType<typeof createPulseState>>>} pulse
  */
 export function derivePulseVisual(pulse) {
   const bpm = Math.round(pulse.bpm || 62);
@@ -434,7 +434,7 @@ export function derivePulseVisual(pulse) {
     sympatheticPct: Math.round((pulse.sympathetic || 0) * 100),
     parasympatheticPct: Math.round((pulse.parasympathetic || 0) * 100),
     beatWave: generateBeatWave(
-      /** @type {ReturnType<typeof createPulseStateV2>} */ (pulse),
+      /** @type {ReturnType<typeof createPulseState>} */ (pulse),
     ),
     fatigueText:
       (pulse.fatigueLoad || 0) > 0.1

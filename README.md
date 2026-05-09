@@ -56,6 +56,11 @@ termvis setup --yes --language zh --provider codex
 termvis setting --name "Termvis Soul" --profile default --role "terminal companion" --style "warm, concise, responsive"
 termvis setting --show
 termvis doctor
+
+# Run codex with full visual soul rail
+termvis life -- env codex
+
+# Run codex transparently (background tracking only)
 termvis life -- codex
 ```
 
@@ -118,6 +123,8 @@ termvis adapter <list|all|codex|claude|copilot|gemini|opencode> [--json]
 termvis schema [--compact]
 termvis layout-demo
 ```
+
+**Note on Codex:** The command `termvis life -- codex` is a special case. It acts as a transparent passthrough, tracking life events in the background without drawing the visual UI. If you want the full living terminal UI with Codex, use `termvis life -- env codex` instead.
 
 ## Configuration
 

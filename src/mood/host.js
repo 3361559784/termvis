@@ -107,7 +107,7 @@ function normalizeToolSummary(ts) {
 /**
  * @param {object} [overrides]
  */
-export function createHostStateV2(overrides = {}) {
+export function createHostState(overrides = {}) {
   const o = overrides || {};
   const session = o.session || {};
   const mode = o.mode || {};
@@ -201,14 +201,14 @@ export function createHostStateV2(overrides = {}) {
  */
 export function createHostModel(initialConfig = {}) {
   const cfg = initialConfig || {};
-  let state = /** @type {Record<string, unknown>} */ (structuredClone(createHostStateV2(cfg)));
+  let state = /** @type {Record<string, unknown>} */ (structuredClone(createHostState(cfg)));
 
   function getState() {
-    return createHostStateV2(state);
+    return createHostState(state);
   }
 
   function reset() {
-    state = /** @type {Record<string, unknown>} */ (structuredClone(createHostStateV2(cfg)));
+    state = /** @type {Record<string, unknown>} */ (structuredClone(createHostState(cfg)));
   }
 
   /**

@@ -1,9 +1,9 @@
 import { createMoodEngine } from "./engine.js";
-import { createPulseEngine, derivePulseVisual } from "./pulse-v2.js";
-import { createPresenceScheduler, derivePresenceVisual } from "./presence-v2.js";
-import { createHostModel, deriveHostVisual } from "./host-v2.js";
-import { createMemoryModel, deriveMemoryVisual } from "./memory-v2.js";
-import { bridgeSignalToV2, deriveSignalVisual } from "./signal-v2.js";
+import { createPulseEngine, derivePulseVisual } from "./pulse.js";
+import { createPresenceScheduler, derivePresenceVisual } from "./presence.js";
+import { createHostModel, deriveHostVisual } from "./host.js";
+import { createMemoryModel, deriveMemoryVisual } from "./memory-model.js";
+import { bridgeSignalToV2, deriveSignalVisual } from "./signal.js";
 import { findPrototype } from "./prototypes.js";
 import { createSoulSaysEngine } from "../soul-says/engine.js";
 

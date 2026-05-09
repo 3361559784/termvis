@@ -43,12 +43,12 @@ Life options:
   --reader|--plain        Plain trace: one-line soul status on stderr (no XML HUD)
 
 API configuration:
-  Set via 'termvis setup' or environment variables:
+  Set via 'termvis setup' or environment variables: 
   OPENAI_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, OLLAMA_BASE_URL,
   TERMVIS_CODEX_BIN, TERMVIS_CODEX_MODEL
 
 Config: ~/.config/termvis/config.json
-Docs:   doc/guides/quickstart.md
+Docs:   docs/guides/quickstart.md
 `;
 
 export async function main(argv, io) {

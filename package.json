@@ -20,7 +20,6 @@
     "bin",
     "scripts",
     "src",
-    "doc",
     "docs",
     "examples/avatar-soft.svg",
     "examples/termvis.config.jsonc",

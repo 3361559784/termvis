@@ -1,7 +1,8 @@
 import { mkdir, writeFile, appendFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { performance } from "node:perf_hooks";
+import fs from "node:fs";
 import { createTermvisEngine } from "../application/termvis-engine.js";
 import { findChafa } from "../render/chafa-runner.js";
 import { createLifeSnapshot, applyLifeEvent, inferLifeEventFromChunk, serializeLifeEvent } from "./state.js";
@@ -45,6 +46,7 @@ export async function runLivingCommand({
   if (!command) throw new Error("runLivingCommand requires a command");
   const engine = await createTermvisEngine({ cwd: io.cwd, env: io.env });
   const lifeConfig = engine.config?.life || {};
+  const transparentHostMode = shouldPassthroughHostCommand(command);
   let runtimeAvatar = avatar || lifeConfig.avatar || DEFAULT_LIFE_AVATAR_PATH;
   const runtimeTitle = title || "termvis living shell";
   const runtimeStrict = strict ?? lifeConfig.strict ?? true;
@@ -87,7 +89,7 @@ export async function runLivingCommand({
     message: message || "awakening the terminal presence"
   });
   let soulState = createSoulState({
-    enabled: soulEnabled ?? soulConfig.enabled ?? true,
+    enabled: transparentHostMode ? false : (soulEnabled ?? soulConfig.enabled ?? true),
     mode: soulMode || soulConfig.mode || "companion",
     sessionId: soulSession,
     narration: soulNarration || message || soulConfig.narration || "awake beside the terminal stream",
@@ -102,9 +104,10 @@ export async function runLivingCommand({
   const soulStore = soulState.enabled ? await createSoulEventStore({ cwd: io.cwd, sessionId: soulState.sessionId, state: soulState }) : null;
   let soulOffset = soulStore?.offset || 0;
   let closing = false;
+  let exitHandled = false;
 
   const cognitionConfig = engine.config.cognition || {};
-  const cognitionEnabled = Boolean(soulState.enabled);
+  const cognitionEnabled = Boolean(soulState.enabled) && !transparentHostMode;
   /** @type {Awaited<ReturnType<import("../soul-bios/engine.js").createIntelligentSoulEngine>> | null} */
   let biosEngine = null;
   let biosTimer = null;
@@ -121,7 +124,7 @@ export async function runLivingCommand({
         sessionId: soulState.sessionId,
         requireLlm: false,
         strictLlmVisuals: false,
-        llmPreferred: chooseLifeLlmProvider(cognitionConfig, hostId),
+        llmPreferred: chooseLifeLlmProvider(cognitionConfig),
         persona: cognitionConfig.persona || soulConfig.persona || { name: soulName || "Termvis Soul", speakingStyle: { brevity: 2, warmth: 1, metaphor: 0, emoji: 0 } },
         memoryAllowReflective: Boolean(cognitionConfig.memory?.reflective),
         safetyJudge: Boolean(cognitionConfig.safetyJudge),
@@ -154,8 +157,9 @@ export async function runLivingCommand({
       }
     }
   }
-  const useTui = Boolean(!runtimeReaderMode && pty && io.stdin.isTTY && io.stdout.isTTY);
+  const useTui = Boolean(!transparentHostMode && !runtimeReaderMode && pty && io.stdin.isTTY && io.stdout.isTTY);
   const useReaderPty = Boolean(runtimeReaderMode && pty && io.stdin.isTTY && io.stdout.isTTY);
+  const useTransparentPty = Boolean(transparentHostMode && pty && io.stdin.isTTY && io.stdout.isTTY);
   const tui = useTui ? await createLifeTui({
     io,
     engine,
@@ -173,20 +177,52 @@ export async function runLivingCommand({
     minRailWidth: runtimeLayout.minRailWidth,
     maxRailWidth: runtimeLayout.maxRailWidth
   }) : null;
+
+  const handleProcessExit = () => {
+    if (exitHandled) return;
+    exitHandled = true;
+    try {
+      if (tui && !transparentHostMode && !runtimeReaderMode) {
+        fs.writeSync(1, terminalModeResetSequence());
+      }
+    } catch { /* ignore */ }
+  };
+
+  process.on("exit", handleProcessExit);
+  const sigHandler = () => {
+    cleanupRuntime().finally(() => process.exit(0));
+  };
+  const crashHandler = (err) => {
+    if (exitHandled) return;
+    exitHandled = true;
+    // Attempt graceful terminal reset before exiting with error
+    try {
+      if (tui && !transparentHostMode && !runtimeReaderMode) {
+        fs.writeSync(1, terminalModeResetSequence());
+      }
+    } catch { /* ignore */ }
+    console.error(`\n[termvis] Fatal error:`, err);
+    process.exit(1);
+  };
+  process.on("SIGINT", sigHandler);
+  process.on("SIGTERM", sigHandler);
+  process.on("uncaughtException", crashHandler);
+  process.on("unhandledRejection", crashHandler);
+
   if (tui) tui.start(snapshot);
   else if (runtimeReaderMode) writeReaderLine(io, snapshot);
-  else await writeLifeFrame(io, engine, snapshot, { avatar: runtimeAvatar, width, avatarWidth: runtimeAvatarWidth, avatarHeight: runtimeAvatarHeight, symbolic: runtimeSymbolic, strict: false });
+  else if (!transparentHostMode) await writeLifeFrame(io, engine, snapshot, { avatar: runtimeAvatar, width, avatarWidth: runtimeAvatarWidth, avatarHeight: runtimeAvatarHeight, symbolic: runtimeSymbolic, strict: false });
   await writeTrace(tracePath, snapshot, { type: "life-start", at: new Date() });
-  writeTitle(io, snapshot);
+  if (!transparentHostMode) writeTitle(io, snapshot);
   let userInputBuffer = "";
   let lastTypingSignalAt = 0;
-  const soulPoller = soulStore && (tui || runtimeReaderMode) ? setInterval(() => {
+  const soulPoller = soulStore && !transparentHostMode && (tui || runtimeReaderMode) ? setInterval(() => {
     pollSoulEvents().catch(() => {});
   }, 500) : null;
   soulPoller?.unref?.();
 
   // Bios tick scheduler: ingests recent host output as signals and produces a SoulFrame
-  if (biosEngine && (tui || runtimeReaderMode)) {
+  if (biosEngine && !transparentHostMode && (tui || runtimeReaderMode)) {
     biosTimer = setInterval(() => {
       tickBios().catch(() => {});
     }, 800);
@@ -230,12 +266,27 @@ export async function runLivingCommand({
             if (snapshot.state !== previousState) writeReaderLine(io, snapshot);
           }
         })
+      : useTransparentPty
+        ? await runWithPty(pty, command, args, io, {
+          cols: io.stdout.columns || 80,
+          rows: io.stdout.rows || 25,
+          resetTerminalOnCleanup: false,
+          mirrorHostOutput: true,
+          onOutput: async (chunk) => {
+            if (closing) return;
+            const previousState = snapshot.state;
+            snapshot = await observeChunk(snapshot, chunk, tracePath, applyDerivedSoulEvent);
+            if (closing) return;
+            if (!transparentHostMode) writeTitle(io, snapshot);
+            if (runtimeReaderMode && snapshot.state !== previousState) writeReaderLine(io, snapshot);
+          }
+        })
       : await runWithPipes(command, args, io, async (chunk) => {
         if (closing) return;
         const previousState = snapshot.state;
         snapshot = await observeChunk(snapshot, chunk, tracePath, applyDerivedSoulEvent);
         if (closing) return;
-        writeTitle(io, snapshot);
+        if (!transparentHostMode) writeTitle(io, snapshot);
         if (runtimeReaderMode && snapshot.state !== previousState) writeReaderLine(io, snapshot);
         if (runtimePulse === "line") io.stderr.write?.(`${renderLifeStatusLine(snapshot, io.stdout.columns || 80)}\n`);
       });
@@ -293,7 +344,7 @@ export async function runLivingCommand({
     if (biosEngine) await biosEngine.dispose().catch(() => {});
     if (tui) tui.stop(snapshot);
     else if (runtimeReaderMode) writeReaderLine(io, snapshot);
-    else await writeLifeFrame(io, engine, snapshot, { avatar: runtimeAvatar, width, avatarWidth: runtimeAvatarWidth, avatarHeight: runtimeAvatarHeight, symbolic: runtimeSymbolic, strict: false });
+    else if (!transparentHostMode) await writeLifeFrame(io, engine, snapshot, { avatar: runtimeAvatar, width, avatarWidth: runtimeAvatarWidth, avatarHeight: runtimeAvatarHeight, symbolic: runtimeSymbolic, strict: false });
   }
 
   async function pollSoulEvents() {
@@ -482,14 +533,14 @@ export async function runLivingCommand({
         ? {
             ...snapshot.soul,
             persona: {
-              ...(snapshot.soul.persona || {}),
+              ...snapshot.soul.persona,
               ...(soulState.persona || {})
             }
           }
-        : snapshot.soul
+        : undefined
     };
-    if (avatarChanged && tui) {
-      await tui.configureAvatar({
+    if (avatarChanged) {
+      if (tui) await tui.configureAvatar({
         avatar: runtimeAvatar,
         avatarFit: runtimeAvatarFit,
         avatarAlign: runtimeAvatarAlign,
@@ -497,182 +548,59 @@ export async function runLivingCommand({
         avatarWidth: runtimeAvatarWidth,
         avatarHeight: runtimeAvatarHeight
       });
-    } else {
-      tui?.update(snapshot);
     }
   }
-}
-
-function biosDiagnostic(snapshot = {}) {
-  const soul = snapshot.soul || {};
-  const v2 = soul.v2Frame || {};
-  const says = v2.soulSays || {};
-  const llm = soul.llmStats || {};
-  const lastCall = Array.isArray(llm.recentCalls) ? llm.recentCalls[0] : null;
-  return {
-    llm: {
-      provider: llm.providerName || "none",
-      model: llm.model || "",
-      available: Boolean(llm.available),
-      state: llm.state || "idle",
-      totalCalls: Number(llm.totalCalls || 0),
-      totalErrors: Number(llm.totalErrors || 0),
-      lastCallOk: lastCall ? Boolean(lastCall.ok) : null,
-      lastError: lastCall?.error ? sanitizeErrorMessage(lastCall.error) : null
-    },
-    soulSays: {
-      action: says.action || "silent",
-      state: says.state || "silent",
-      hasFrame: Boolean(says.frame?.text),
-      history: Array.isArray(says.history) ? says.history.length : 0
-    }
-  };
-}
-
-function sanitizeErrorMessage(error) {
-  return String(error?.message || error || "")
-    .replace(/sk-[A-Za-z0-9_-]{10,}/g, "<redacted>")
-    .replace(/npm_[A-Za-z0-9_-]{10,}/g, "<redacted>")
-    .slice(0, 240);
-}
-
-function isSoulConfigEvent(event = {}) {
-  return String(event.type || "") === "soul.config";
-}
-
-function mergePersonaPatch(current, patch) {
-  const base = current && typeof current === "object" ? current : {};
-  const next = { ...base, ...patch };
-  if (patch?.speakingStyle && typeof patch.speakingStyle === "object") {
-    next.speakingStyle = {
-      ...(base.speakingStyle && typeof base.speakingStyle === "object" ? base.speakingStyle : {}),
-      ...patch.speakingStyle
-    };
-  }
-  if (patch?.boundaries && typeof patch.boundaries === "object") {
-    next.boundaries = {
-      ...(base.boundaries && typeof base.boundaries === "object" ? base.boundaries : {}),
-      ...patch.boundaries
-    };
-  }
-  return next;
-}
-
-function stableSnapshotSignature(snapshot = {}) {
-  const soul = snapshot.soul || {};
-  const v2 = soul.v2Frame || {};
-  const v2Mood = v2.mood || {};
-  const v2Pulse = v2.pulse || {};
-  const v2Pres = v2.presence || {};
-  const v2Says = v2.soulSays || {};
-  return JSON.stringify({
-    state: snapshot.state,
-    moodPrimary: v2Mood.primary,
-    valence: v2Mood.caap?.core?.valence,
-    arousal: v2Mood.caap?.core?.arousal,
-    dominance: v2Mood.caap?.core?.dominance,
-    bpm: Math.round(v2Pulse.bpm || 0),
-    pulseEvent: v2Pulse.pulseEvent,
-    stressLoad: Math.round((v2Pulse.stressLoad || 0) * 100),
-    recoveryLoad: Math.round((v2Pulse.recoveryLoad || 0) * 100),
-    presMode: v2Pres.mode,
-    presStance: v2Pres.stance,
-    saysAction: v2Says.action,
-    saysText: v2Says.frame?.text || soul.says?.main || soul.reply || "",
-    personaName: soul.persona?.name || "",
-    avatar: snapshot.avatar || ""
-  });
-}
-
-function chooseLifeLlmProvider(cognitionConfig = {}, hostId = "") {
-  const configured = String(cognitionConfig.llm?.provider || "auto").toLowerCase();
-  if (configured && configured !== "auto") return configured;
-  return String(hostId || "").toLowerCase() === "codex" ? "codex" : configured;
-}
-
-function writeReaderLine(io, snapshot) {
-  io.stderr?.write?.(`[termvis] ${renderSoulReaderTraceLine(snapshot)}\n`);
-}
-
-export async function renderLivingFrame(options = {}) {
-  const engine = options.engine || await createTermvisEngine({ cwd: options.io?.cwd, env: options.io?.env });
-  const lifeConfig = engine.config?.life || {};
-  const soulConfig = lifeConfig.soul || {};
-  const runtimeAvatar = options.avatar || lifeConfig.avatar || DEFAULT_LIFE_AVATAR_PATH;
-  const persona = {
-    ...(soulConfig.persona || {}),
-    ...(options.soulName ? { name: options.soulName } : {})
-  };
-  const snapshot = options.snapshot || createLifeSnapshot({
-    title: options.title,
-    host: options.host,
-    avatar: runtimeAvatar,
-    state: options.state,
-    message: options.message
-  });
-  const soul = snapshot.soul || createSoulState({
-    enabled: options.soulEnabled ?? soulConfig.enabled ?? true,
-    mode: options.soulMode || soulConfig.mode,
-    sessionId: options.soulSession,
-    narration: options.soulNarration || options.message || soulConfig.narration,
-    reply: options.soulReply || soulConfig.reply,
-    persona
-  });
-  return renderLifeFrame({
-    ...options,
-    engine,
-    avatar: runtimeAvatar,
-    symbolic: options.symbolic ?? lifeConfig.symbolic ?? true,
-    strict: options.strict ?? lifeConfig.strict ?? false,
-    avatarWidth: options.avatarWidth ?? lifeConfig.avatarWidth,
-    avatarHeight: options.avatarHeight ?? lifeConfig.avatarHeight,
-    snapshot: { ...snapshot, avatar: runtimeAvatar, soul }
-  });
-}
-
-async function observeChunk(snapshot, chunk, tracePath, onEvent) {
-  const event = inferLifeEventFromChunk(chunk);
-  const next = applyLifeEvent(snapshot, event);
-  await writeTrace(tracePath, next, event);
-  return onEvent ? onEvent(next, event) : next;
-}
-
-async function writeLifeFrame(io, engine, snapshot, options) {
-  try {
-    const frame = await renderLifeFrame({ io, engine, snapshot, ...options });
-    io.stdout.write(frame);
-  } catch (err) {
-    try {
-      io.stderr?.write?.(`[termvis] life frame unavailable: ${sanitizeErrorMessage(err)}\n`);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-async function createTrace(cwd, snapshot) {
-  const dir = join(cwd || process.cwd(), ".termvis", "life-traces");
-  await mkdir(dir, { recursive: true });
-  const safeTime = snapshot.startedAt.replace(/[:.]/g, "-");
-  const path = join(dir, `${safeTime}.jsonl`);
-  await writeFile(path, `${JSON.stringify({ type: "life-trace", snapshot })}\n`, "utf8");
-  return path;
-}
-
-async function writeTrace(path, snapshot, event) {
-  if (!path) return;
-  await appendFile(path, `${serializeLifeEvent(snapshot, event)}\n`, "utf8");
 }
 
 async function loadNodePty() {
   try {
-    return await import("node-pty");
+    const pty = await import("node-pty");
+    return pty.default || pty;
   } catch {
     return null;
   }
 }
 
-function runWithPty(pty, command, args, io, { onOutput, onResize, inputTransform, resetTerminalOnCleanup = true, cols, rows } = {}) {
+async function createTrace(cwd, snapshot) {
+  const dir = join(cwd, ".termvis", "life-traces");
+  await mkdir(dir, { recursive: true });
+  const filename = `${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
+  const path = join(dir, filename);
+  await writeFile(path, serializeLifeEvent(snapshot, { type: "life-start", at: new Date() }) + "\n");
+  return path;
+}
+
+async function writeTrace(path, snapshot, event) {
+  if (!path) return;
+  const line = serializeLifeEvent(snapshot, event);
+  await appendFile(path, line + "\n");
+}
+
+function writeReaderLine(io, snapshot) {
+  const line = renderSoulReaderTraceLine(snapshot.soul, snapshot);
+  io.stderr.write(`${line}\n`);
+}
+
+async function observeChunk(snapshot, chunk, tracePath, applyDerivedSoulEvent) {
+  const event = inferLifeEventFromChunk(chunk);
+  if (event) {
+    const nextSnapshot = applyLifeEvent(snapshot, event);
+    const soulSnapshot = applyDerivedSoulEvent(nextSnapshot, event);
+    await writeTrace(tracePath, soulSnapshot, event);
+    return soulSnapshot;
+  }
+  return snapshot;
+}
+
+function runWithPty(pty, command, args, io, {
+  cols,
+  rows,
+  onOutput,
+  onResize,
+  inputTransform,
+  mirrorHostOutput = false,
+  resetTerminalOnCleanup = true
+} = {}) {
   return new Promise((resolve, reject) => {
     const pending = [];
     let settled = false;
@@ -687,7 +615,16 @@ function runWithPty(pty, command, args, io, { onOutput, onResize, inputTransform
     });
 
     const dataDisposable = child.onData((chunk) => {
-      pending.push(onOutput?.(chunk).catch(() => {}));
+    const pending = new Set();
+    // ... inside onData callback
+    const dataDisposable = child.onData((chunk) => {
+      const p = Promise.allSettled([
+        mirrorHostOutput ? writeStream(io.stdout, chunk) : Promise.resolve(),
+        onOutput?.(chunk).catch(() => {})
+      ]);
+      pending.add(p);
+      p.finally(() => pending.delete(p));
+    });
     });
     const exitDisposable = child.onExit(async ({ exitCode }) => {
       if (settled) return;
@@ -881,6 +818,11 @@ function writeTitle(io, snapshot) {
   io.stdout.write(`\u001b]0;${terminalTitle(snapshot)}\u0007`);
 }
 
+export function shouldPassthroughHostCommand(command = "") {
+  const name = basename(String(command || "")).toLowerCase();
+  return /^codex(?:$|[-_.])/u.test(name);
+}
+
 /**
  * On Windows, node-pty's ConPTY cannot resolve bare command names through
  * PATH. This always delegates to cmd.exe /c which handles PATH, PATHEXT,
@@ -891,4 +833,42 @@ function resolveCommandForPty(command, args, env = process.env) {
   if (process.platform !== "win32") return { command, args };
   const shell = env.COMSPEC || "cmd.exe";
   return { command: shell, args: ["/c", command, ...args] };
+}
+
+function stableSnapshotSignature(snap) {
+  return `${snap.state}:${snap.message}:${snap.soul?.mood?.discrete || ""}`;
+}
+
+function biosDiagnostic(snap) {
+  return {
+    state: snap.state,
+    soul: {
+      mood: snap.soul?.mood?.discrete,
+      arousal: snap.soul?.mood?.arousal,
+      valence: snap.soul?.mood?.valence
+    }
+  };
+}
+
+function sanitizeErrorMessage(msg) {
+  return String(msg || "").replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+export function chooseLifeLlmProvider(cognition) {
+  return cognition.llm?.provider || cognition.provider || "auto";
+}
+
+function isSoulConfigEvent(event) {
+  return event && (event.persona || event.avatar);
+}
+
+function mergePersonaPatch(base = {}, patch = {}) {
+  return {
+    ...base,
+    ...patch,
+    speakingStyle: {
+      ...(base.speakingStyle || {}),
+      ...(patch.speakingStyle || {})
+    }
+  };
 }

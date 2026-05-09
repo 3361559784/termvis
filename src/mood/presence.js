@@ -102,7 +102,7 @@ function freezeCauseIds(v) {
  *   causeIds: readonly string[],
  * }>}
  */
-export function createPresenceStateV2(overrides = {}) {
+export function createPresenceState(overrides = {}) {
   const o = overrides && typeof overrides === "object" ? overrides : {};
   const mode = normalizePresenceModeString(o.mode, "ambient");
   const stance = normalizePresenceStanceString(o.stance, "observe");
@@ -373,8 +373,8 @@ function bumpLastSpeakAt(signals, now, prev) {
 /**
  * @param {object} [config]
  * @returns {{
- *   update: (mood: unknown, host: unknown, mem: unknown, signals: unknown, now?: number) => Readonly<ReturnType<typeof createPresenceStateV2>>,
- *   getState: () => Readonly<ReturnType<typeof createPresenceStateV2>>,
+ *   update: (mood: unknown, host: unknown, mem: unknown, signals: unknown, now?: number) => Readonly<ReturnType<typeof createPresenceState>>,
+ *   getState: () => Readonly<ReturnType<typeof createPresenceState>>,
  *   reset: () => void,
  * }}
  */
@@ -387,8 +387,8 @@ export function createPresenceScheduler(config = {}) {
     guardianCooldownMs: Math.max(0, Number(cfgRaw.guardianCooldownMs ?? 3000) || 3000),
   };
 
-  /** @type {ReturnType<typeof createPresenceStateV2>} */
-  let state = createPresenceStateV2();
+  /** @type {ReturnType<typeof createPresenceState>} */
+  let state = createPresenceState();
 
   let modeEnteredAt = Date.now();
   let previousMode = "ambient";
@@ -396,7 +396,7 @@ export function createPresenceScheduler(config = {}) {
   let lastActivityAt = Date.now();
 
   function reset() {
-    state = createPresenceStateV2();
+    state = createPresenceState();
     const now = Date.now();
     modeEnteredAt = now;
     previousMode = "ambient";
@@ -546,7 +546,7 @@ export function createPresenceScheduler(config = {}) {
       Array.isArray(moodCauseIds) ? moodCauseIds : state.causeIds,
     );
 
-    state = createPresenceStateV2({
+    state = createPresenceState({
       mode,
       stance,
       attention,
@@ -569,7 +569,7 @@ export function createPresenceScheduler(config = {}) {
 }
 
 /**
- * @param {ReturnType<typeof createPresenceStateV2>} presence
+ * @param {ReturnType<typeof createPresenceState>} presence
  * @returns {Readonly<{
  *   modeIcon: string,
  *   modeText: string,
@@ -584,7 +584,7 @@ export function createPresenceScheduler(config = {}) {
  * }>}
  */
 export function derivePresenceVisual(presence) {
-  const p = presence && typeof presence === "object" ? presence : createPresenceStateV2();
+  const p = presence && typeof presence === "object" ? presence : createPresenceState();
   const mode = normalizePresenceModeString(p.mode, "ambient");
   const stance = normalizePresenceStanceString(p.stance, "observe");
   const gazeTarget = normalizeGazeTargetString(p.gazeTarget, "terminal");

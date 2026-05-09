@@ -39,6 +39,6 @@ This repository’s working name is `chafa_cli` / **termvis**; SDR is the concep
 
 ## Conventions
 
-- **Cross-links** use paths relative to this `doc/` tree.
+- **Cross-links** use paths relative to this `docs/` tree.
 - **Mermaid** diagrams render in GitHub, GitLab, and many Markdown viewers.
 - **Normative vs illustrative**: tables and formulas here describe the SDR design; the shipped `termvis` binary may subset or extend them—see the main repo docs for file-level truth.

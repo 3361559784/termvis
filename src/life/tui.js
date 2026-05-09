@@ -3,6 +3,7 @@ import { colorize, resolveTheme, bold, dim, italic, underline, style, gradientTe
 import { cellWidth, padCells, stripAnsi, truncateCells, wrapCells } from "../core/width.js";
 import { DEFAULT_LIFE_AVATAR_PATH } from "./frame.js";
 import { getLifePulse, getLifeStateInfo, createLifeSnapshot } from "./state.js";
+import { diagnoseAvatarRenderer } from "../render/avatar-diagnostics.js";
 import {
   createMoodFrame,
   createSoulState,
@@ -18,6 +19,8 @@ const ALT_SCREEN_PATTERN = /\u001b\[\?(?:1049|1047|1048)[hl]/g;
 const CURSOR_VISIBILITY_PATTERN = /\u001b\[\?25[hl]/g;
 const ESC = "\u001b";
 const INPUT_PRIVATE_MODES = new Set(["1", "1000", "1002", "1003", "1004", "1005", "1006", "1015", "2004"]);
+const TUI_UNSTABLE_SYMBOLS = new Set(["braille", "sextant", "quad"]);
+const TUI_DEFAULT_SYMBOLS = "block+border+space";
 
 const AMBIENT_BREATH_MS = Object.freeze({ quiet: 4800, normal: 3800, active: 2800 });
 const RAIL_TEXT = Object.freeze({
@@ -585,11 +588,20 @@ export async function createLifeTui({
     avatarScale
   });
 
+  const avatarDiagnostics = diagnoseAvatarRenderer({
+    env: io?.env,
+    config: runtime.config,
+    cwd: io?.cwd,
+    caps,
+    symbolic
+  });
+
   return new LifeTui({
     io,
     runtime,
     avatarPayload,
     avatarSource: avatar,
+    avatarDiagnostics,
     symbolic,
     avatarFit,
     avatarAlign,
@@ -631,6 +643,13 @@ async function renderTuiAvatar({
   const result = await runtime.renderBlock({
     source: { type: "file", path: snapshot?.avatar || avatar },
     alt: `${snapshot?.title || "termvis life"} avatar`,
+    config: {
+      ...runtime.config,
+      render: {
+        ...(runtime.config?.render || {}),
+        symbols: selectTuiAvatarSymbols(runtime.config, caps, runtime.env)
+      }
+    },
     caps: {
       ...caps,
       pixelProtocol: symbolic ? "none" : caps.pixelProtocol,
@@ -647,12 +666,42 @@ async function renderTuiAvatar({
   return result.payload;
 }
 
+export function selectTuiAvatarSymbols(config = {}, caps = {}, env = process.env) {
+  const forced = String(env?.TERMVIS_LIFE_AVATAR_SYMBOLS || "").trim().toLowerCase();
+  if (forced === "ascii") return "ascii";
+  if (forced === "safe") return TUI_DEFAULT_SYMBOLS;
+  if (shouldForceAsciiAvatarSymbols(caps)) return "ascii";
+  const raw = String(config?.render?.symbols || "").trim();
+  if (!raw) return TUI_DEFAULT_SYMBOLS;
+  if (raw.toLowerCase() === "ascii") return "ascii";
+  const filtered = [];
+  const seen = new Set();
+  for (const part of raw.split("+")) {
+    const token = String(part || "").trim().toLowerCase();
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    if (TUI_UNSTABLE_SYMBOLS.has(token)) continue;
+    filtered.push(token);
+  }
+  if (filtered.length === 0) return TUI_DEFAULT_SYMBOLS;
+  if (!filtered.includes("space")) filtered.push("space");
+  if (!filtered.includes("block")) filtered.unshift("block");
+  return filtered.join("+");
+}
+
+function shouldForceAsciiAvatarSymbols(caps = {}) {
+  const termProgram = String(caps?.termProgram || "").toLowerCase();
+  const term = String(caps?.term || "").toLowerCase();
+  return /jetbrains|jediterm|vscode/u.test(termProgram) || /\bvscode\b/u.test(term);
+}
+
 export class LifeTui {
   constructor({
     io,
     runtime,
     avatarPayload,
     avatarSource,
+    avatarDiagnostics,
     symbolic = true,
     avatarFit,
     avatarAlign,
@@ -680,6 +729,7 @@ export class LifeTui {
     this.runtime = runtime;
     this.avatarPayload = avatarPayload || "";
     this.avatarSource = avatarSource;
+    this.avatarDiagnostics = avatarDiagnostics;
     this.symbolic = Boolean(symbolic);
     this.avatarFit = avatarFit;
     this.avatarAlign = avatarAlign;
@@ -708,6 +758,7 @@ export class LifeTui {
     this._active = false;
     this.railScrollOffset = 0;
     this._animationTimer = null;
+    this.hostInputModes = new Set();
   }
 
   start(snapshot) {
@@ -734,6 +785,7 @@ export class LifeTui {
 
   writeHost(chunk) {
     if (!this._active) return;
+    updateHostInputModes(String(chunk || ""), this.hostInputModes);
     const passthrough = extractTerminalModePassthrough(chunk);
     if (passthrough) this.write(passthrough);
     this.hostViewport.write(chunk);
@@ -744,11 +796,8 @@ export class LifeTui {
     this.snapshot = snapshot || this.snapshot;
     this._active = false;
     this.stopAnimation();
-    if (this._usingAltScreen) {
-      this.write(`${terminalModeResetSequence()}${leaveAlternateScreen()}`);
-      this._usingAltScreen = false;
-      return;
-    }
+    this.hostInputModes.clear();
+    this._usingAltScreen = false;
     this.write(`${terminalModeResetSequence()}${cursorTo(this.rows, 1)}\n`);
   }
 
@@ -893,7 +942,8 @@ export class LifeTui {
     return translateHostInputForTui(input, {
       hostLeft: this.hostLeft,
       hostCols: this.hostCols,
-      hostRows: this.hostRows
+      hostRows: this.hostRows,
+      hostInputModes: this.hostInputModes
     });
   }
 
@@ -919,7 +969,8 @@ export class LifeTui {
       language: this.language,
       breathMsResolved: inferBreathCadence(snapshot),
       now: this.reduceMotion ? soulRenderTime(snapshot) : new Date(),
-      scrollOffset: this.railScrollOffset
+      scrollOffset: this.railScrollOffset,
+      avatarDiagnostics: this.avatarDiagnostics
     });
     const changed = [];
     for (let index = 0; index < panel.length; index++) {
@@ -979,7 +1030,8 @@ export function terminalModeResetSequence() {
     `${ESC}[?2026l`,
     `${ESC}[>4;0m`,
     showCursor(),
-    resetScrollRegion()
+    resetScrollRegion(),
+    leaveAlternateScreen()
   ].join("");
 }
 
@@ -987,11 +1039,35 @@ export function terminalMouseEnableSequence() {
   return [`${ESC}[?1000h`, `${ESC}[?1006h`].join("");
 }
 
-export function translateHostInputForTui(input, { hostLeft = 1, hostCols = 80, hostRows = 24 } = {}) {
+export function translateHostInputForTui(input, { hostLeft = 1, hostCols = 80, hostRows = 24, hostInputModes } = {}) {
   if (input == null) return input;
-  if (Buffer.isBuffer(input)) return translateHostInputBuffer(input, { hostLeft, hostCols, hostRows });
-  const translated = translateHostInputString(String(input), { hostLeft, hostCols, hostRows });
+  const options = { hostLeft, hostCols, hostRows, hostInputModes };
+  if (Buffer.isBuffer(input)) return translateHostInputBuffer(input, options);
+  const translated = translateHostInputString(String(input), options);
   return translated;
+}
+
+function updateHostInputModes(text, set) {
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] === ESC && text[index + 1] === "[") {
+      const parsed = readCsi(text, index);
+      if (parsed) {
+        if ((parsed.final === "h" || parsed.final === "l") && parsed.body.startsWith("?")) {
+          const enable = parsed.final === "h";
+          const parts = parsed.body.slice(1).split(";");
+          for (const part of parts) {
+            const mode = part.split(":")[0].trim();
+            if (enable) set.add(mode);
+            else set.delete(mode);
+          }
+        }
+        index = parsed.end;
+        continue;
+      }
+    }
+    index += 1;
+  }
 }
 
 export function renderLifeTuiPanel({
@@ -1007,7 +1083,8 @@ export function renderLifeTuiPanel({
   language = "en",
   now = new Date(),
   breathMsResolved,
-  scrollOffset = 0
+  scrollOffset = 0,
+  avatarDiagnostics
 } = {}) {
   const viewportWidth = Math.max(24, Number(width || 32));
   const viewportHeight = Math.max(8, Number(height || 24));
@@ -1047,7 +1124,8 @@ export function renderLifeTuiPanel({
     caps,
     language,
     tier,
-    now
+    now,
+    avatarDiagnostics
   }) : createLifeOnlyRailBody({
     stateInfo,
     pulse,
@@ -1061,7 +1139,8 @@ export function renderLifeTuiPanel({
     caps,
     language,
     tier,
-    now
+    now,
+    avatarDiagnostics
   });
 
   const soulSays = resolveSoulSaysForDisplay(soul);
@@ -1116,16 +1195,16 @@ export function renderLifeTuiPanel({
   return [...renderedMain, ...saysStripLines];
 }
 
-function createSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date() }) {
+function createSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date(), avatarDiagnostics }) {
   // Detect rich (soul-bios SoulFrame-shaped) vs legacy soul
   const isRich = Boolean(soul && (soul.llmStats !== undefined || (soul.mood && Array.isArray(soul.mood.tags))));
   if (isRich) {
-    return createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language, tier, now });
+    return createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language, tier, now, avatarDiagnostics });
   }
-  return createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language, tier, now });
+  return createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language, tier, now, avatarDiagnostics });
 }
 
-function createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date() }) {
+function createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date(), avatarDiagnostics }) {
   const narrow = tier === "narrow";
   const wide = tier === "wide";
   const roomy = height >= 20 && !narrow;
@@ -1150,6 +1229,11 @@ function createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapsh
   const foot = `${snapshot?.outputBytes || 0}b`;
   const footAugmented = wide && snapshot?.lastDigest ? `${foot} │ ${truncateMeta(snapshot.lastDigest, Math.max(10, width - cellWidth(foot) - 3))}` : foot;
   const details = [];
+  if (avatarDiagnostics) {
+    const diagText = `avatar: ${avatarDiagnostics.mode}`;
+    const reasonText = avatarDiagnostics.reason.replace(/_/g, " ");
+    details.push(padCells(`  ${dim(diagText)} ${dim("·")} ${dim(reasonText)}`, width));
+  }
   if (!narrow && soul.mode === "transparent" && soul.persona?.boundary) {
     details.push(metricLine(railText(language, "source"), localizeTerm(language, soul.lastSource || "system"), width, theme, caps));
     details.push(...wrapLabel(railText(language, "bound"), soul.persona.boundary, width).slice(0, 2).map((line) => paint(line, "muted", theme, caps)));
@@ -1178,7 +1262,7 @@ function createLegacySoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapsh
  * Rich rail body: anime art + full SoulFrame display + LLM status.
  * Used when the snapshot was built via soulFrameToTuiSnapshot from the intelligent engine.
  */
-function createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date() }) {
+function createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date(), avatarDiagnostics }) {
   const narrow = tier === "narrow";
   const wide = tier === "wide";
   const roomy = height >= 20 && !narrow;
@@ -1331,6 +1415,11 @@ function createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot
   const footFull = soul.provenance?.llmRunId ? railText(language, "soulVoiceLive") : railText(language, "soulVoiceReady");
 
   const details = [];
+  if (avatarDiagnostics) {
+    const diagText = `avatar: ${avatarDiagnostics.mode}`;
+    const reasonText = avatarDiagnostics.reason.replace(/_/g, " ");
+    details.push(padCells(`  ${dim(diagText)} ${dim("·")} ${dim(reasonText)}`, width));
+  }
   if (!narrow && soul.mode === "transparent" && soul.persona?.boundary) {
     details.push(iconLine("⚠", railText(language, "source"), localizeTerm(language, soul.lastSource || "system"), width, theme, caps, "muted"));
     details.push(...wrapLabel(railText(language, "bound"), soul.persona.boundary, width).slice(0, 2).map((line) => paint(line, "muted", theme, caps)));
@@ -1355,7 +1444,7 @@ function createRichSoulRailBody({ soul, soulPulse, breathMs, stateInfo, snapshot
   });
 }
 
-function createLifeOnlyRailBody({ stateInfo, pulse, breathMs, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date() }) {
+function createLifeOnlyRailBody({ stateInfo, pulse, breathMs, snapshot, avatarLines, title, width, height, theme, caps, language = "en", tier = "medium", now = new Date(), avatarDiagnostics }) {
   const message = snapshot?.message || stateInfo.voice;
   const footBase = snapshot?.lastDigest ? `${snapshot.lastDigest}  ${snapshot.outputBytes || 0}b` : `${snapshot?.outputBytes || 0}b`;
   const narrow = tier === "narrow";
@@ -1374,6 +1463,11 @@ function createLifeOnlyRailBody({ stateInfo, pulse, breathMs, snapshot, avatarLi
       metricLine(railText(language, "heart"), pulseLine, width, theme, caps),
       metricLine(railText(language, "signal"), snapshot?.lastSignal || "boot", width, theme, caps)
     ];
+  }
+  if (avatarDiagnostics) {
+    const diagText = `avatar: ${avatarDiagnostics.mode}`;
+    const reasonText = avatarDiagnostics.reason.replace(/_/g, " ");
+    metrics.push(padCells(`  ${dim(diagText)} ${dim("·")} ${dim(reasonText)}`, width));
   }
   return composeRailBody({
     header: narrow ? [railTitle(title, width, theme, caps)] : [
@@ -1870,14 +1964,25 @@ function parseX10MouseBuffer(buffer, index) {
   };
 }
 
-function rewriteSgrMouse(event, { hostLeft = 1, hostCols = 80, hostRows = 24 } = {}) {
+function rewriteSgrMouse(event, { hostLeft = 1, hostCols = 80, hostRows = 24, hostInputModes } = {}) {
+  // Only forward if the child actually enabled mouse mode (1000, 1002, or 1003) 
+  // AND enabled SGR mode (1006).
+  if (!hostInputModes) return "";
+  const hasMouse = hostInputModes.has("1000") || hostInputModes.has("1002") || hostInputModes.has("1003");
+  const hasSgr = hostInputModes.has("1006");
+  if (!hasMouse || !hasSgr) return "";
+
   const x = event.x - Math.max(0, Number(hostLeft || 1) - 1);
   const y = event.y;
   if (!isHostCell(x, y, hostCols, hostRows)) return "";
   return `${ESC}[<${event.button};${x};${y}${event.final}`;
 }
 
-function rewriteX10Mouse(sequence, event, { hostLeft = 1, hostCols = 80, hostRows = 24 } = {}) {
+function rewriteX10Mouse(sequence, event, { hostLeft = 1, hostCols = 80, hostRows = 24, hostInputModes } = {}) {
+  if (!hostInputModes) return null;
+  const hasMouse = hostInputModes.has("1000") || hostInputModes.has("1002") || hostInputModes.has("1003");
+  if (!hasMouse) return null;
+
   const x = event.x - Math.max(0, Number(hostLeft || 1) - 1);
   const y = event.y;
   if (!isHostCell(x, y, hostCols, hostRows)) return null;
